@@ -318,6 +318,66 @@ export interface ProviderModelMapping {
 	 */
 	pricingTiers?: PricingTier[];
 	/**
+	 * Peak/off-peak time-of-day pricing. The mapping's base
+	 * inputPrice/outputPrice/cachedInputPrice are the regular flat prices,
+	 * billed before `effectiveAt` (and always when `peakPricing` is absent).
+	 * On/after `effectiveAt`, `peak` applies while the current UTC hour falls
+	 * inside `hoursUtc` and `offPeak` applies otherwise. Only DeepSeek's
+	 * first-party API uses this today — peak 01:00-04:00 and 06:00-10:00 UTC
+	 * at double the off-peak rates, effective 2026-08-16.
+	 */
+	peakPricing?: {
+		/**
+		 * ISO-8601 instant when peak/off-peak pricing takes effect. Before
+		 * this date the mapping's base inputPrice/outputPrice/cachedInputPrice
+		 * (the regular flat rates) apply.
+		 */
+		effectiveAt: string;
+		/**
+		 * Prices charged during peak hours (on/after effectiveAt).
+		 */
+		peak: {
+			/**
+			 * Price per input token in USD during peak hours.
+			 */
+			inputPrice: Price;
+			/**
+			 * Price per output token in USD during peak hours.
+			 */
+			outputPrice: Price;
+			/**
+			 * Price per cached input token in USD during peak hours. When
+			 * unset, billing falls back to `inputPrice`, matching base-price
+			 * behavior.
+			 */
+			cachedInputPrice?: Price;
+		};
+		/**
+		 * Prices charged during off-peak hours (on/after effectiveAt).
+		 */
+		offPeak: {
+			/**
+			 * Price per input token in USD during off-peak hours.
+			 */
+			inputPrice: Price;
+			/**
+			 * Price per output token in USD during off-peak hours.
+			 */
+			outputPrice: Price;
+			/**
+			 * Price per cached input token in USD during off-peak hours. When
+			 * unset, billing falls back to `inputPrice`, matching base-price
+			 * behavior.
+			 */
+			cachedInputPrice?: Price;
+		};
+		/**
+		 * Peak hours in UTC as half-open [start, end) hour ranges (0-23). All
+		 * hours outside these ranges are off-peak.
+		 */
+		hoursUtc: readonly [start: number, end: number][];
+	};
+	/**
 	 * Maximum context window size in tokens
 	 */
 	contextSize?: number;
@@ -500,7 +560,10 @@ export interface ProviderModelMapping {
 	 */
 	parallelToolCalls?: boolean;
 	/**
-	 * Whether this specific model supports JSON output mode for this provider
+	 * SOFT JSON output (models API: `json_output`): the model can be nudged
+	 * into emitting JSON (response_format json_object / prompt guidance).
+	 * There is no server-side schema guarantee — off-schema or malformed JSON
+	 * is possible and must be caught by the consumer's parser.
 	 */
 	jsonOutput?: boolean;
 	/**
@@ -511,7 +574,13 @@ export interface ProviderModelMapping {
 	 */
 	healStreamingJsonOutput?: boolean;
 	/**
-	 * Whether this provider supports JSON schema output mode (json_schema response format)
+	 * STRICT JSON output schema (models API: `structured_outputs`): the
+	 * UPSTREAM PROVIDER enforces schema-guided decoding (e.g. OpenAI
+	 * structured outputs, vLLM guided decoding). Declare true ONLY when the
+	 * true upstream provider natively supports it. The gateway MUST NOT
+	 * emulate schema enforcement (no prompt+validate adapter); when false,
+	 * requests with response_format: json_schema are rejected with a 400
+	 * ("does not support JSON schema output mode").
 	 */
 	jsonOutputSchema?: boolean;
 	/**

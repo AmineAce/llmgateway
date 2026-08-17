@@ -742,7 +742,15 @@ export function transformStreamingToOpenai(
 							? candidate.index
 							: candidateIdx,
 					delta,
-					finish_reason: null,
+					finish_reason:
+						candidate.finishReason === undefined
+							? null
+							: mapFinishReasonToOpenai(
+									candidate.finishReason,
+									usedProvider,
+									toolCalls.length > 0,
+									data.promptFeedback?.blockReason,
+								),
 				};
 			});
 
@@ -1530,6 +1538,7 @@ export function transformStreamingToOpenai(
 		case "ranoai":
 		case "granite":
 		case "tundra":
+		case "permafrost":
 		case "xiaomi":
 		case "azure-ai-foundry":
 		case "vertex-openai":
